@@ -49,7 +49,7 @@ class MyriaInstaller(DefaultClusterSetup):
                  database_name="myriadb",
                  database_password="".join(random.sample(pwd_strbase, 10)),
                  myria_commit=None,
-                 jvm_version="java-1.7.0-openjdk-i386"):
+                 jvm_version="java-1.7.0-openjdk"):
         if not database_password:
             log.error("Database password must be provided in config file.")
             raise ValueError("No database password in configuration file")
@@ -113,6 +113,9 @@ class MyriaInstaller(DefaultClusterSetup):
             pg_path=self.postgres_path, port=self.postgres_port,
             grant=sql_grant_right, db=self.database_name,
             user=self.postgres_user)
+
+        log.info('Removing source deb http://www.cs.wisc.edu/condor/debian/development lenny contrib')
+        node.ssh.execute('sed -i "s/deb http:\/\/www.cs.wisc.edu\/condor\/debian\/development lenny contrib/#deb http:\/\/www.cs.wisc.edu\/condor\/debian\/development lenny contrib/g" /etc/apt/sources.list')
 
         log.info("Begin configuring {}".format(node.alias))
         node.apt_command('update')
