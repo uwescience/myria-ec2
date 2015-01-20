@@ -3,7 +3,7 @@ from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
 
 DEFAULT_VERSION = 9.1
-DEFAULT_PORT = 5401
+DEFAULT_PORT = 5432
 DEFAULT_DATA_PATH = '/var/postgresdata'
 DEFAULT_PATH_FORMAT = '/usr/lib/postgresql/{version}/bin'
 DEFAULT_PATH = DEFAULT_PATH_FORMAT.format(version=DEFAULT_VERSION)
@@ -82,6 +82,21 @@ class PostgresInstaller(DefaultClusterSetup):
         command = """sudo -u postgres {pg_path}/psql -p {port} -c "CREATE DATABASE {db}"
                     """.format(pg_path=path, port=port, db=name)
         return PostgresInstaller._execute(node, command, path)
+
+    @staticmethod
+    def set_listeners(node, listeners, path='/etc/postgresql/{version}/main/postgresql.conf', version=DEFAULT_VERSION):
+        node.ssh.execute(r'sed -i "s/^\s*\#\?\s*listen_addresses\s*=\s*''.*\?''/listen_addresses = \'{listeners}\'/ig" {path}'.format(
+            listeners=listeners,
+            path=path.format(version=version)))
+
+    @staticmethod
+    def add_host_authentication(node, authentication, path='/etc/postgresql/{version}/main/pg_hba.conf', version=DEFAULT_VERSION):
+        with node.ssh.remote_file(path.format(version=version), 'a') as descriptor:
+            descriptor.write(authentication + '\n')
+
+    @staticmethod
+    def restart(node):
+        node.ssh.execute('sudo service postgresql restart')
 
     @staticmethod
     def _execute(node, command, path=DEFAULT_PATH):

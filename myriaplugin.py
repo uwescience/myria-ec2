@@ -28,7 +28,7 @@ class MyriaInstaller(DefaultClusterSetup):
 
     def __init__(self, 
                  name='MyriaEC2',
-                 path='/var/myria_ec2_deployment',
+                 path='/mnt/myria_ec2_deployment',
                  dbms='postgresql',
                  heap=None,
                  rest_port=8753,
@@ -42,9 +42,9 @@ class MyriaInstaller(DefaultClusterSetup):
                  jvm_version="java-1.7.0-openjdk",
                  database_name='myria',
 
-                 postgres_port=5401,
+                 postgres_port=5432,
                  postgres_version="9.1",
-                 postgres_path="/var/postgresdata",
+                 postgres_path="/mnt/postgresdata",
                  postgres_name=None,
                  postgres_username="postgresadmin",
                  postgres_password="".join(random.sample(string.lowercase+string.digits, 10))):
@@ -75,6 +75,9 @@ class MyriaInstaller(DefaultClusterSetup):
         node.package_install(' '.join(self.packages))
         node.ssh.execute(
             'sudo update-java-alternatives -s {}'.format(self.jvm_version))
+
+        if self.dbms == "postgresql":
+            self.configure_postgres(node)
 
     def run(self, nodes, master, user, user_shell, volumes):
         log.info('Beginning Myria configuration')
@@ -108,9 +111,6 @@ class MyriaInstaller(DefaultClusterSetup):
         with master.ssh.remote_file('deployment.cfg.ec2', 'w') as descriptor:
             descriptor.write(
                 self.get_configuration(master, slave_nodes))
-
-        if self.dbms == "postgresql":
-            self.configure_postgres(node)
 
         enter_deploy = "cd {}".format(self.deploy_dir)
         log.info('Begin Myria cluster setup on {}'.format(master.alias))
@@ -150,3 +150,8 @@ class MyriaInstaller(DefaultClusterSetup):
         PostgresInstaller.create_user(node, username, password, path, port)
         PostgresInstaller.create_database(node, database, path, port)
         PostgresInstaller.grant_all(node, database, username, path, port)
+        PostgresInstaller.set_listeners(node, '*', version=version)
+        PostgresInstaller.add_host_authentication(node, 
+                                                  'host all all 0.0.0.0/0 md5', 
+                                                  version=version)
+        PostgresInstaller.restart(node)
