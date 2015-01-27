@@ -1,6 +1,7 @@
 import time
 import random
 import string
+from postgresplugin import PostgresInstaller, DEFAULT_PATH_FORMAT
 from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
 
@@ -23,16 +24,11 @@ database_password = {database_password}
 {workers}
 """
 
-# command templates
-sql_create_user = "CREATE USER uwdb WITH PASSWORD"
-sql_grant_right = "GRANT ALL PRIVILEGES ON DATABASE"
-pwd_strbase = string.lowercase+string.digits
-
-
 class MyriaInstaller(DefaultClusterSetup):
 
-    def __init__(self, name='MyriaEC2',
-                 path='/var/myria_ec2_deployment',
+    def __init__(self, 
+                 name='MyriaEC2',
+                 path='/mnt/myria_ec2_deployment',
                  dbms='postgresql',
                  heap=None,
                  rest_port=8753,
@@ -42,18 +38,18 @@ class MyriaInstaller(DefaultClusterSetup):
                  additional_packages=[],
                  repository='https://github.com/uwescience/myria.git',
                  install_directory='~/myria',
-                 postgres_port="5401",
-                 postgres_version="9.1",
-                 postgres_user="uwdb",
-                 postgres_data="/var/postgresdata",
-                 database_name="myriadb",
-                 database_password="".join(random.sample(pwd_strbase, 10)),
                  myria_commit=None,
-                 jvm_version="java-1.7.0-openjdk"):
-        if not database_password:
-            log.error("Database password must be provided in config file.")
-            raise ValueError("No database password in configuration file")
+                 jvm_version="java-1.7.0-openjdk",
+                 database_name='myria',
+
+                 postgres_port=5401,
+                 postgres_version="9.1",
+                 postgres_path="/mnt/postgresdata",
+                 postgres_name=None,
+                 postgres_username="uwdb",
+                 postgres_password="".join(random.sample(string.lowercase+string.digits, 10))):
         super(MyriaInstaller, self).__init__()
+
         self.packages = required_packages + additional_packages
         self.repository = repository
         self.directory = install_directory
@@ -64,92 +60,29 @@ class MyriaInstaller(DefaultClusterSetup):
         self.rest_port = rest_port
         self.master_port = master_port
         self.worker_port = worker_port
-        self.postgres_port = postgres_port
-        self.postgres_version = postgres_version
-        self.postgres_user = postgres_user
-        self.postgres_data = postgres_data
         self.database_name = database_name
-        self.database_password = database_password
         self.myria_commit = myria_commit
         self.jvm_version = jvm_version
 
-        #generated properties
-        self.postgres_log = "{}/server.log".format(postgres_data)
-        self.postgres_path = "/usr/lib/postgresql/{version}/bin".format(
-            version=postgres_version)
-        self.postgres_conf = '/etc/postgresql/{}/main/postgresql.conf'.format(
-            postgres_version)
-        self.postgres_option = "-c config_file={conf} -p {port}".format(
-            conf=self.postgres_conf, port=postgres_port)
         self.deploy_dir = "{}/myriadeploy".format(install_directory)
+        self.postgres = {'port': postgres_port, 'version': postgres_version, 
+                         'path': postgres_path, 'name': postgres_name, 
+                         'username': postgres_username, 'password': postgres_password}
 
     def _set_up_node(self, node):
-        """
-        Set up postgres in each slave node.
-        """
-
-        cd = "cd {}".format(self.postgres_data)
-
-        start_pg = """
-        sudo -u postgres {pg_path}/pg_ctl -D {data} -o "{opt}" -l {log} start;
-        """.format(
-            pg_path=self.postgres_path, data=self.postgres_data,
-            opt=self.postgres_option, log=self.postgres_log)
-
-        create_user = """
-        sudo -u postgres {pg_path}/psql -p {port} -c "{create_user} \'{pwd}\'"
-        """.format(
-            pg_path=self.postgres_path, port=self.postgres_port,
-            create_user=sql_create_user, pwd=self.database_password)
-
-        create_db = """
-        sudo -u postgres {pg_path}/psql -p {port} -c "CREATE DATABASE {db}"
-        """.format(pg_path=self.postgres_path, port=self.postgres_port,
-                   db=self.database_name)
-
-        grant_right = """
-        sudo -u postgres {pg_path}/psql -p {port} -c "{grant} {db} TO {user}"
-        """.format(
-            pg_path=self.postgres_path, port=self.postgres_port,
-            grant=sql_grant_right, db=self.database_name,
-            user=self.postgres_user)
-
-        log.info('Removing source deb http://www.cs.wisc.edu/condor/debian/development lenny contrib')
-        node.ssh.execute('sed -i "s/deb http:\/\/www.cs.wisc.edu\/condor\/debian\/development lenny contrib/#deb http:\/\/www.cs.wisc.edu\/condor\/debian\/development lenny contrib/g" /etc/apt/sources.list')
-
         log.info("Begin configuring {}".format(node.alias))
         node.apt_command('update')
         node.package_install(' '.join(self.packages))
         node.ssh.execute(
             'sudo update-java-alternatives -s {}'.format(self.jvm_version))
 
-        if not node.is_master():
-            log.info("Setting postgres on {}".format(node.alias))
-            node.apt_install("postgresql-{}".format(self.postgres_version))
-            node.ssh.execute("sudo service postgresql stop")
-            node.ssh.execute("sudo mkdir -p {}".format(self.postgres_data))
-            node.ssh.execute("sudo chown postgres {}".format(
-                self.postgres_data))
-            node.ssh.execute(start_pg)
-            # sleep 5 seconds wait for postgres start
-            time.sleep(5)
-
-            log.info("Creating user and database {db} on {node}".format(
-                db=self.database_name, node=node.alias))
-            node.ssh.execute(';'.join([cd, create_user]))
-            node.ssh.execute(';'.join([cd, create_db]))
-
-            log.info("Granting all right to {user} on {node}".format(
-                user=self.postgres_user, node=node.alias))
-            node.ssh.execute(';'.join([cd, grant_right]))
+        if self.dbms == "postgresql":
+            self.configure_postgres(node)
 
     def run(self, nodes, master, user, user_shell, volumes):
-        # set slave nodes
-        self.slave_nodes = filter(lambda x: not x.is_master(), nodes)
-
         log.info('Beginning Myria configuration')
 
-        # init java and postgres in parallel
+        # init nodes in parallel
         for node in nodes:
             self.pool.simple_job(
                 self._set_up_node, (node), jobid=node.alias)
@@ -173,7 +106,8 @@ class MyriaInstaller(DefaultClusterSetup):
 
         log.info(
             'Begin write deployment configuration on {}'.format(master.alias))
-        slave_nodes = filter(lambda x: not x.is_master(), nodes)
+
+        slave_nodes = filter(lambda node: not node.is_master(), nodes)
         with master.ssh.remote_file('deployment.cfg.ec2', 'w') as descriptor:
             descriptor.write(
                 self.get_configuration(master, slave_nodes))
@@ -196,7 +130,7 @@ class MyriaInstaller(DefaultClusterSetup):
     def get_configuration(self, master, nodes):
         return myria_config.format(
             path=self.path, name=self.name,
-            dbms=self.dbms, database_password=self.database_password,
+            dbms=self.dbms, database_password=self.postgres['password'],
             port=self.rest_port,
             heap='heap = ' + self.heap if self.heap else '',
             master_alias=master.dns_name,
@@ -204,3 +138,26 @@ class MyriaInstaller(DefaultClusterSetup):
             workers='\n'.join('{} = {}:{}::{}'.format(
                 id + 1, node.dns_name, self.worker_port, self.database_name)
                 for id, node in enumerate(nodes)))
+
+    def configure_postgres(self, node):
+        database = self.database_name
+        username = self.postgres['username']
+        password = self.postgres['password']
+        version = self.postgres['version']
+        path = DEFAULT_PATH_FORMAT.format(version=version)
+        port = self.postgres['port']
+
+        if username != 'uwdb':
+          log.info("WARNING: Myria requires a postgres user named 'uwdb'")
+        if port != 5401:
+          log.info('WARNING: Myria requires postgresql to be listening on port 5401')
+
+        log.info('Begin Postgres configuration on {}'.format(node.alias))
+        PostgresInstaller.create_user(node, username, password, path, port)
+        PostgresInstaller.create_database(node, database, path, port)
+        PostgresInstaller.grant_all(node, database, username, path, port)
+        PostgresInstaller.set_listeners(node, '*', version=version)
+        PostgresInstaller.add_host_authentication(node, 
+                                                  'host all all 0.0.0.0/0 md5', 
+                                                  version=version)
+        PostgresInstaller.restart(node)
