@@ -42,11 +42,11 @@ class MyriaInstaller(DefaultClusterSetup):
                  jvm_version="java-1.7.0-openjdk",
                  database_name='myria',
 
-                 postgres_port=5432,
+                 postgres_port=5401,
                  postgres_version="9.1",
                  postgres_path="/mnt/postgresdata",
                  postgres_name=None,
-                 postgres_username="postgresadmin",
+                 postgres_username="uwdb",
                  postgres_password="".join(random.sample(string.lowercase+string.digits, 10))):
         super(MyriaInstaller, self).__init__()
 
@@ -82,7 +82,7 @@ class MyriaInstaller(DefaultClusterSetup):
     def run(self, nodes, master, user, user_shell, volumes):
         log.info('Beginning Myria configuration')
 
-        # init java and postgres in parallel
+        # init nodes in parallel
         for node in nodes:
             self.pool.simple_job(
                 self._set_up_node, (node), jobid=node.alias)
@@ -147,6 +147,12 @@ class MyriaInstaller(DefaultClusterSetup):
         path = DEFAULT_PATH_FORMAT.format(version=version)
         port = self.postgres['port']
 
+        if username != 'uwdb':
+          log.info("WARNING: Myria requires a postgres user named 'uwdb'")
+        if port != 5401:
+          log.info('WARNING: Myria requires postgresql to be listening on port 5401')
+
+        log.info('Begin Postgres configuration on {}'.format(node.alias))
         PostgresInstaller.create_user(node, username, password, path, port)
         PostgresInstaller.create_database(node, database, path, port)
         PostgresInstaller.grant_all(node, database, username, path, port)
