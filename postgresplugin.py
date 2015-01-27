@@ -45,6 +45,9 @@ class PostgresInstaller(DefaultClusterSetup):
             node.ssh.execute("sudo service postgresql stop")
             node.ssh.execute("sudo mkdir -p {}".format(self.database_path))
             node.ssh.execute("sudo chown postgres {}".format(self.database_path))
+
+            self.set_port(node, self.port, version=self.version)
+
             node.ssh.execute(start_pg)
 
             # sleep 5 seconds wait for postgres start
@@ -87,6 +90,12 @@ class PostgresInstaller(DefaultClusterSetup):
     def set_listeners(node, listeners, path='/etc/postgresql/{version}/main/postgresql.conf', version=DEFAULT_VERSION):
         node.ssh.execute(r'sed -i "s/^\s*\#\?\s*listen_addresses\s*=\s*''.*\?''/listen_addresses = \'{listeners}\'/ig" {path}'.format(
             listeners=listeners,
+            path=path.format(version=version)))
+
+    @staticmethod
+    def set_port(node, port, path='/etc/postgresql/{version}/main/postgresql.conf', version=DEFAULT_VERSION):
+        node.ssh.execute(r'sed -i "s/^\s*port\s*=\s*[0-9]\+/port = {port}/ig" {path}'.format(
+            port=port,
             path=path.format(version=version)))
 
     @staticmethod
