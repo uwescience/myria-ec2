@@ -1,9 +1,13 @@
+import os
 import time
 import random
 import string
 from postgresplugin import PostgresInstaller, DEFAULT_PATH_FORMAT
 from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
+
+DEFAULT_MYRIA_POSTGRES_PORT = 5401
+DEFAULT_MYRIA_CONSTANTS_PATH = 'src/edu/washington/escience/myria/MyriaConstants.java'
 
 # myria deployment configuration template
 myria_config = """
@@ -98,6 +102,10 @@ class MyriaInstaller(DefaultClusterSetup):
             master.ssh.execute(
                 'cd {dir} && git checkout {commit}'.format(
                     dir=self.directory, commit=self.myria_commit))
+
+        if self.dbms == "postgresql":
+          self.configure_myria_postgres_port(master, self.postgres['port'])
+
         log.info('Begin build on {}'.format(master.alias))
         master.ssh.execute('cd {} && ./gradlew clean'.format(self.directory))
         master.ssh.execute('cd {} && ./gradlew eclipseClasspath'.format(
@@ -149,8 +157,6 @@ class MyriaInstaller(DefaultClusterSetup):
 
         if username != 'uwdb':
           log.info("WARNING: Myria requires a postgres user named 'uwdb'")
-        if port != 5401:
-          log.info('WARNING: Myria requires postgresql to be listening on port 5401')
 
         log.info('Begin Postgres configuration on {}'.format(node.alias))
         PostgresInstaller.create_user(node, username, password, path, port)
@@ -161,3 +167,10 @@ class MyriaInstaller(DefaultClusterSetup):
                                                   'host all all 0.0.0.0/0 md5', 
                                                   version=version)
         PostgresInstaller.restart(node)
+
+    def configure_myria_postgres_port(self, node, port):
+        if port != DEFAULT_MYRIA_POSTGRES_PORT:
+          log.info("HACK: Updating Myria's postgres port to {}".format(port))
+          node.ssh.execute(r'sed -i "s/STORAGE_POSTGRESQL_PORT\s*=\s*[0-9]\+/STORAGE_POSTGRESQL_PORT = {port}/ig" {path}'.format(
+              port=port,
+              path=os.path.join(self.directory, DEFAULT_MYRIA_CONSTANTS_PATH)))
