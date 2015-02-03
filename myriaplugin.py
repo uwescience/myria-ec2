@@ -38,7 +38,8 @@ class MyriaInstaller(DefaultClusterSetup):
                  rest_port=8753,
                  master_port=8001,
                  worker_port=9001,
-                 required_packages=['git', 'openjdk-7-jre', 'openjdk-7-jdk'],
+                 required_packages=['git', 'openjdk-7-jre', 'openjdk-7-jdk', 
+                                    'libxml2-dev', 'libxslt1-dev', 'python-dev'],
                  additional_packages=[],
                  repository='https://github.com/uwescience/myria.git',
                  install_directory='~/myria',
@@ -132,6 +133,12 @@ class MyriaInstaller(DefaultClusterSetup):
         master.ssh.execute(
             '{} && sudo ./launch_cluster.sh ~/deployment.cfg.ec2'.format(
                 enter_deploy))
+
+        log.info('Installing Myria-Python on {}'.format(master.alias))
+        master.ssh.execute(
+            'git clone https://github.com/uwescience/myria-python.git ~/myria-python &&'
+            'cd ~/myria-python &&'
+            'python setup.py install')
 
         log.info('End Myria configuration')
 
