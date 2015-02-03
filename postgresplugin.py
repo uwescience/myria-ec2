@@ -4,7 +4,7 @@ from starcluster.logger import log
 
 DEFAULT_VERSION = 9.1
 DEFAULT_PORT = 5432
-DEFAULT_DATA_PATH = '/var/postgresdata'
+DEFAULT_DATA_PATH = '/mnt/postgresdata'
 DEFAULT_PATH_FORMAT = '/usr/lib/postgresql/{version}/bin'
 DEFAULT_PATH = DEFAULT_PATH_FORMAT.format(version=DEFAULT_VERSION)
 
