@@ -37,6 +37,8 @@
 
 4) Copy myriaplugin.py to ~/.starcluster/plugins/
 
+5) Copy postgresplugin.py to ~/.starcluster/plugins/
+
 5) Run starcluster:
 
   a) Start a cluster:
