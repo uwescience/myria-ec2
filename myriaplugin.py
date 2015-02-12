@@ -76,6 +76,10 @@ class MyriaInstaller(DefaultClusterSetup):
 
     def _set_up_node(self, node):
         log.info("Begin configuring {}".format(node.alias))
+
+        log.info('*   Removing source deb http://www.cs.wisc.edu/condor/debian/development lenny contrib')
+        node.ssh.execute('sed -i "s/deb http:\/\/www.cs.wisc.edu\/condor\/debian\/development lenny contrib/#deb http:\/\/www.cs.wisc.edu\/condor\/debian\/development lenny contrib/g" /etc/apt/sources.list')
+
         node.apt_command('update')
         node.package_install(' '.join(self.packages))
         node.ssh.execute(
