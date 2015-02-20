@@ -1,55 +1,21 @@
-1) Install and configure StarCluster (e.g., sudo apt-get install starcluster)
+## Installation
 
-  a) Create a default config by executing "starcluster help" and selecting option #2
+1) Install and configure StarCluster (e.g., `sudo apt-get install starcluster`)
+2) Clone the Myria-EC2 repository (`git clone https://github.com/uwescience/myria-ec2.git`)
+3) Install Myria-EC2 (`sudo python setup.py install`)
+4) When prompted, enter your EC2 credentials
 
-  b) Add your AWS credentials to the ~/.starcluster/config file
+## Configuring Cluster Configuration
 
-		(i) Add Access Key and Secret Access key from AWS credentials file
+The cluster configuration file is located (by default) in `~/.starcluster/myriacluster.config`.  
 
-		(ii) User ID is the 12 digit ID found in the IAM Management Console
+The first few lines are most useful to modify the cluster configuration.  The most relevant options are:
 
-  c) Create a UWDB/EC2 key by executing "starcluster createkey UNIQUE_KEYNAME -o ~/.ssh/uwdb.rsa" (if you already have a EC2 keypair, you can select it by modifying ~/.starcluster/myriacluster.config).  Replace UNIQUE_KEYNAME with any keyname that is unique to you.  If you use the same key name as someone else, you will overwrite their key, because we are all using the same AWS account.
+```
+[cluster myriacluster]
+CLUSTER_SIZE = 2                  # How many instances to deploy?
+NODE_INSTANCE_TYPE = t1.micro     # What instance type?
+SPOT_BID = 0.0035                 # Change your spot instance bid prices if requesting a larger instance type!
+``` 
 
-  d) In ~/.starcluster/config, change the lines:
-		[key mykey]
-		KEY_LOCATION=~/.ssh/mykey.rsa
-	
-  	 to:
-		[key UNIQUE_KEYNAME]
-		KEY_LOCATION=~/.ssh/uwdb.rsa
-
-  e) Also in ~/.starcluster/config, change:
-		KEYNAME = mykey
-	
-	to:
-		KEYNAME = UNIQUE_KEYNAME
-
-2) Edit cluster settings: 
-  a) Add the following line to the [global] section of ~/.starcluster/config:
-	INCLUDE=~/.starcluster/myriacluster.config
-
-  b) (optional) add the commit id of myria to the [plugin myriaplugin] section
-  of myriacluster.config, eg:
-  MYRIA_COMMIT = <the commit hash code you want>
-
-
-3) Copy myriacluster.config to ~/.starcluster/
-
-4) Copy myriaplugin.py to ~/.starcluster/plugins/
-
-5) Copy postgresplugin.py to ~/.starcluster/plugins/
-
-5) Run starcluster:
-
-  a) Start a cluster:
-       starcluster start -c myriacluster myriacluster
-
-  b) Alternatively, specify a cluster of size n instances:
-       starcluster start -c myriacluster --cluster-size n myriacluster
-
-  c) Terminate a cluster:
-       starcluster terminate myriacluster
-
-  d) StarCluster supports restarting and stopping clusters as well ("starcluster restart myriacluster" and "starcluster stop myriacluster" respectively)
-
-  c) Modify cluster settings in ~/.starcluster/myriaconfig (e.g., change instance sizes, add spot instances).  Or, use the command line (see http://star.mit.edu/cluster/docs/latest/manual/shell_completion.html)
+See the commented lines in the configuration file for a complete list of options.
