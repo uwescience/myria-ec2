@@ -1,9 +1,9 @@
 ## Installation
 
-1) Install and configure StarCluster (e.g., `sudo apt-get install starcluster`)
-2) Clone the Myria-EC2 repository (`git clone https://github.com/uwescience/myria-ec2.git`)
-3) Install Myria-EC2 (`sudo python setup.py install`)
-4) When prompted, enter your EC2 credentials
+1. Install and configure StarCluster (e.g., `sudo apt-get install starcluster`)
+2. Clone the Myria-EC2 repository (`git clone https://github.com/uwescience/myria-ec2.git`)
+3. Install Myria-EC2 (`sudo python setup.py install`)
+4. When prompted, enter your EC2 credentials
 
 ## Configuring Cluster Configuration
 
