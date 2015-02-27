@@ -11,7 +11,7 @@ The cluster configuration file is located (by default) in `~/.starcluster/myriac
 
 The first few lines are most useful to modify the cluster configuration.  The most relevant options are:
 
-```
+```ini
 [cluster myriacluster]
 CLUSTER_SIZE = 2                  # How many instances to deploy?
 NODE_INSTANCE_TYPE = t1.micro     # What instance type?
