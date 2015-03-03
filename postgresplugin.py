@@ -9,7 +9,7 @@ DEFAULT_PATH_FORMAT = '/usr/lib/postgresql/{version}/bin'
 DEFAULT_PATH = DEFAULT_PATH_FORMAT.format(version=DEFAULT_VERSION)
 
 class PostgresInstaller(DefaultClusterSetup):
-    def __init__(self, 
+    def __init__(self,
                  port=DEFAULT_PORT,
                  version=DEFAULT_VERSION,
                  database_path=DEFAULT_DATA_PATH,
@@ -106,6 +106,13 @@ class PostgresInstaller(DefaultClusterSetup):
     @staticmethod
     def restart(node):
         node.ssh.execute('sudo service postgresql restart')
+
+    @staticmethod
+    def change_data_directory(node):
+        node.ssh.execute("sudo /etc/init.d/postgresql stop")
+        node.ssh.execute(r'sed -i "s+/var/lib/postgresql/{version}/main+/mnt/postgresdata+g" /etc/postgresql/{version}/main/postgresql.conf'.format(version=DEFAULT_VERSION))
+        node.ssh.execute("sudo cp /var/lib/postgresql/{version}/main/server.* {data_path}".format(version=DEFAULT_VERSION, data_path=DEFAULT_DATA_PATH))
+        node.ssh.execute("sudo /etc/init.d/postgresql start")
 
     @staticmethod
     def _execute(node, command, path=DEFAULT_PATH):
