@@ -108,10 +108,10 @@ class PostgresInstaller(DefaultClusterSetup):
         node.ssh.execute('sudo service postgresql restart')
 
     @staticmethod
-    def change_data_directory(node):
+    def change_data_directory(node, path='/etc/postgresql/{version}/main/postgresql.conf', old_data_path='/var/lib/postgresql/{version}/main', version=DEFAULT_VERSION, data_path=DEFAULT_DATA_PATH):
         node.ssh.execute("sudo /etc/init.d/postgresql stop")
-        node.ssh.execute(r'sed -i "s+/var/lib/postgresql/{version}/main+/mnt/postgresdata+g" /etc/postgresql/{version}/main/postgresql.conf'.format(version=DEFAULT_VERSION))
-        node.ssh.execute("sudo cp /var/lib/postgresql/{version}/main/server.* {data_path}".format(version=DEFAULT_VERSION, data_path=DEFAULT_DATA_PATH))
+        node.ssh.execute(r'sed -i "s+{old_data_path}+{data_path}+g" {path}'.format(old_data_path=old_data_path.format(version=version), data_path=data_path, path=path.format(version=version)))
+        node.ssh.execute("sudo cp {old_data_path}/server.* {data_path}".format(old_data_path=old_data_path.format(version=version), data_path=data_path))
         node.ssh.execute("sudo /etc/init.d/postgresql start")
 
     @staticmethod
