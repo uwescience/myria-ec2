@@ -33,21 +33,23 @@ class PostgresInstaller(DefaultClusterSetup):
         if not node.is_master() or self.install_on_master:
             log.info("Setting up postgres on {}".format(node.alias))
 
-            start_pg = """
-            sudo -u postgres {pg_path}/pg_ctl -D {data} -o "{opt}" -l {log} start;
-            """.format(
-                pg_path=self.path, data=self.database_path,
-                opt=self.options, log=self.log)
+            node.ssh.execute("sudo mkdir -p {}".format(self.database_path))
 
             node.ssh.execute('sudo add-apt-repository -r "deb http://www.cs.wisc.edu/condor/debian/development lenny contrib"')
             node.apt_command('update')
             node.apt_install("postgresql-{}".format(self.version))
             node.ssh.execute("sudo service postgresql stop")
-            node.ssh.execute("sudo mkdir -p {}".format(self.database_path))
             node.ssh.execute("sudo chown postgres {}".format(self.database_path))
 
             self.set_port(node, self.port, version=self.version)
 
+            node.ssh.execute("sudo -u postgres {pg_path}/initdb -D {data_path}".format(pg_path=self.path, data_path=self.database_path))
+
+            start_pg = """
+                sudo -u postgres {pg_path}/pg_ctl -D {data} -o "{opt}" -l {log} start;
+                """.format(
+                           pg_path=self.path, data=self.database_path,
+                           opt=self.options, log=self.log)
             node.ssh.execute(start_pg)
 
             # sleep 5 seconds wait for postgres start
@@ -91,6 +93,8 @@ class PostgresInstaller(DefaultClusterSetup):
         node.ssh.execute(r'sed -i "s/^\s*\#\?\s*listen_addresses\s*=\s*''.*\?''/listen_addresses = \'{listeners}\'/ig" {path}'.format(
             listeners=listeners,
             path=path.format(version=version)))
+            #node.ssh.execute(r'sed -i "s+/var/lib/postgresql/9.1/main+/mnt/postgresdata+g" {path}'.format(
+            #path=path.format(version=version)))
 
     @staticmethod
     def set_port(node, port, path='/etc/postgresql/{version}/main/postgresql.conf', version=DEFAULT_VERSION):
@@ -104,15 +108,15 @@ class PostgresInstaller(DefaultClusterSetup):
             descriptor.write(authentication + '\n')
 
     @staticmethod
-    def restart(node):
-        node.ssh.execute('sudo service postgresql restart')
-
-    @staticmethod
     def change_data_directory(node, path='/etc/postgresql/{version}/main/postgresql.conf', old_data_path='/var/lib/postgresql/{version}/main', version=DEFAULT_VERSION, data_path=DEFAULT_DATA_PATH):
         node.ssh.execute("sudo /etc/init.d/postgresql stop")
         node.ssh.execute(r'sed -i "s+{old_data_path}+{data_path}+g" {path}'.format(old_data_path=old_data_path.format(version=version), data_path=data_path, path=path.format(version=version)))
         node.ssh.execute("sudo cp {old_data_path}/server.* {data_path}".format(old_data_path=old_data_path.format(version=version), data_path=data_path))
         node.ssh.execute("sudo /etc/init.d/postgresql start")
+
+    @staticmethod
+    def restart(node):
+        node.ssh.execute('sudo service postgresql restart')
 
     @staticmethod
     def _execute(node, command, path=DEFAULT_PATH):
