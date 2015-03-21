@@ -39,9 +39,12 @@ class PostgresInstaller(DefaultClusterSetup):
             node.apt_command('update')
             node.apt_install("postgresql-{}".format(self.version))
             node.ssh.execute("sudo service postgresql stop")
+            node.ssh.execute("sudo mkdir -m 700 -p {}".format(self.database_path))
             node.ssh.execute("sudo chown postgres {}".format(self.database_path))
+            node.ssh.execute("sudo chgrp postgres {}".format(self.database_path))
 
             self.set_port(node, self.port, version=self.version)
+            self.set_data_path(node, data_path=self.database_path, version=self.version, restart=False)
 
             node.ssh.execute("sudo -u postgres {pg_path}/initdb -D {data_path}".format(pg_path=self.path, data_path=self.database_path))
 
@@ -108,11 +111,35 @@ class PostgresInstaller(DefaultClusterSetup):
             descriptor.write(authentication + '\n')
 
     @staticmethod
-    def change_data_directory(node, path='/etc/postgresql/{version}/main/postgresql.conf', old_data_path='/var/lib/postgresql/{version}/main', version=DEFAULT_VERSION, data_path=DEFAULT_DATA_PATH):
-        node.ssh.execute("sudo /etc/init.d/postgresql stop")
-        node.ssh.execute(r'sed -i "s+{old_data_path}+{data_path}+g" {path}'.format(old_data_path=old_data_path.format(version=version), data_path=data_path, path=path.format(version=version)))
-        node.ssh.execute("sudo cp {old_data_path}/server.* {data_path}".format(old_data_path=old_data_path.format(version=version), data_path=data_path))
-        node.ssh.execute("sudo /etc/init.d/postgresql start")
+    def set_data_path(node, config_path='/etc/postgresql/{version}/main/postgresql.conf',
+                            data_path=DEFAULT_DATA_PATH,
+                            version=DEFAULT_VERSION,
+                            restart=True):
+        PostgresInstaller.stop(node)
+        # Copy server.* from current data directory to new one
+        node.ssh.execute("sudo mkdir -m 700 -p {}".format(data_path))
+        node.ssh.execute(r"""sudo cp -r `grep -Po "data_directory\\s*=\\s*'\K[^']*(?=')" {config_path}`/* {data_path}""".format(
+            config_path=config_path.format(version=version),
+            data_path=data_path))
+        node.ssh.execute("sudo chown -R postgres {}".format(data_path))
+        node.ssh.execute("sudo chgrp -R postgres {}".format(data_path))
+        # Change data directory in .config
+        node.ssh.execute(r"""sed -i "s+^\\s*data_directory\\s*=\\s*'[^']*'+data_directory = '{data_path}'+g" {config_path}""".format(
+            data_path=data_path,
+            config_path=config_path.format(version=version)))
+        PostgresInstaller.start(node)
+
+    @staticmethod
+    def restart(node):
+        node.ssh.execute('sudo service postgresql restart')
+
+    @staticmethod
+    def start(node):
+        node.ssh.execute('sudo service postgresql start')
+
+    @staticmethod
+    def stop(node):
+        node.ssh.execute('sudo service postgresql stop')
 
     @staticmethod
     def restart(node):

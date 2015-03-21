@@ -2,7 +2,7 @@ import os
 import time
 import random
 import string
-from postgresplugin import PostgresInstaller, DEFAULT_PATH_FORMAT
+from postgresplugin import PostgresInstaller, DEFAULT_PATH_FORMAT, DEFAULT_DATA_PATH
 from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
 
@@ -30,7 +30,7 @@ database_password = {database_password}
 
 class MyriaInstaller(DefaultClusterSetup):
 
-    def __init__(self, 
+    def __init__(self,
                  name='MyriaEC2',
                  path='/mnt/myria_ec2_deployment',
                  dbms='postgresql',
@@ -38,7 +38,7 @@ class MyriaInstaller(DefaultClusterSetup):
                  rest_port=8753,
                  master_port=8001,
                  worker_port=9001,
-                 required_packages=['git', 'openjdk-7-jre', 'openjdk-7-jdk', 
+                 required_packages=['git', 'openjdk-7-jre', 'openjdk-7-jdk',
                                     'libxml2-dev', 'libxslt1-dev', 'python-dev'],
                  additional_packages=[],
                  repository='https://github.com/uwescience/myria.git',
@@ -49,7 +49,7 @@ class MyriaInstaller(DefaultClusterSetup):
 
                  postgres_port=5401,
                  postgres_version="9.1",
-                 postgres_path="/mnt/postgresdata",
+                 postgres_path=DEFAULT_PATH_FORMAT,
                  postgres_name=None,
                  postgres_username="uwdb",
                  postgres_password="".join(random.sample(string.lowercase+string.digits, 10))):
@@ -163,14 +163,13 @@ class MyriaInstaller(DefaultClusterSetup):
         username = self.postgres['username']
         password = self.postgres['password']
         version = self.postgres['version']
-        path = DEFAULT_PATH_FORMAT.format(version=version)
+        path = self.postgres['path'].format(version=version)
         port = self.postgres['port']
 
         if username != 'uwdb':
           log.info("WARNING: Myria requires a postgres user named 'uwdb'")
 
         log.info('Begin Postgres configuration on {}'.format(node.alias))
-        PostgresInstaller.change_data_directory(node)
         PostgresInstaller.create_user(node, username, password, path, port)
         PostgresInstaller.create_database(node, database, path, port)
         PostgresInstaller.grant_all(node, database, username, path, port)
