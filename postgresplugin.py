@@ -96,8 +96,6 @@ class PostgresInstaller(DefaultClusterSetup):
         node.ssh.execute(r'sed -i "s/^\s*\#\?\s*listen_addresses\s*=\s*''.*\?''/listen_addresses = \'{listeners}\'/ig" {path}'.format(
             listeners=listeners,
             path=path.format(version=version)))
-            #node.ssh.execute(r'sed -i "s+/var/lib/postgresql/9.1/main+/mnt/postgresdata+g" {path}'.format(
-            #path=path.format(version=version)))
 
     @staticmethod
     def set_port(node, port, path='/etc/postgresql/{version}/main/postgresql.conf', version=DEFAULT_VERSION):
