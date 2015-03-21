@@ -6,7 +6,7 @@ from postgresplugin import PostgresInstaller, DEFAULT_PATH_FORMAT
 from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
 
-DEFAULT_MYRIA_POSTGRES_PORT = 5401
+DEFAULT_MYRIA_POSTGRES_PORT = 5432
 DEFAULT_MYRIA_CONSTANTS_PATH = 'src/edu/washington/escience/myria/MyriaConstants.java'
 
 # myria deployment configuration template
@@ -30,7 +30,7 @@ database_password = {database_password}
 
 class MyriaInstaller(DefaultClusterSetup):
 
-    def __init__(self, 
+    def __init__(self,
                  name='MyriaEC2',
                  path='/mnt/myria_ec2_deployment',
                  dbms='postgresql',
@@ -38,7 +38,7 @@ class MyriaInstaller(DefaultClusterSetup):
                  rest_port=8753,
                  master_port=8001,
                  worker_port=9001,
-                 required_packages=['git', 'openjdk-7-jre', 'openjdk-7-jdk', 
+                 required_packages=['git', 'openjdk-7-jre', 'openjdk-7-jdk',
                                     'libxml2-dev', 'libxslt1-dev', 'python-dev'],
                  additional_packages=[],
                  repository='https://github.com/uwescience/myria.git',
@@ -47,7 +47,7 @@ class MyriaInstaller(DefaultClusterSetup):
                  jvm_version="java-1.7.0-openjdk",
                  database_name='myria',
 
-                 postgres_port=5401,
+                 postgres_port=DEFAULT_MYRIA_POSTGRES_PORT,
                  postgres_version="9.1",
                  postgres_path="/mnt/postgresdata",
                  postgres_name=None,
@@ -70,8 +70,8 @@ class MyriaInstaller(DefaultClusterSetup):
         self.jvm_version = jvm_version
 
         self.deploy_dir = "{}/myriadeploy".format(install_directory)
-        self.postgres = {'port': postgres_port, 'version': postgres_version, 
-                         'path': postgres_path, 'name': postgres_name, 
+        self.postgres = {'port': postgres_port, 'version': postgres_version,
+                         'path': postgres_path, 'name': postgres_name,
                          'username': postgres_username, 'password': postgres_password}
 
     def _set_up_node(self, node):
@@ -174,8 +174,8 @@ class MyriaInstaller(DefaultClusterSetup):
         PostgresInstaller.create_database(node, database, path, port)
         PostgresInstaller.grant_all(node, database, username, path, port)
         PostgresInstaller.set_listeners(node, '*', version=version)
-        PostgresInstaller.add_host_authentication(node, 
-                                                  'host all all 0.0.0.0/0 md5', 
+        PostgresInstaller.add_host_authentication(node,
+                                                  'host all all 0.0.0.0/0 md5',
                                                   version=version)
         PostgresInstaller.restart(node)
 
