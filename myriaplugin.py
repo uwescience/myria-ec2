@@ -6,7 +6,7 @@ from postgresplugin import PostgresInstaller, DEFAULT_PATH_FORMAT, DEFAULT_DATA_
 from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
 
-DEFAULT_MYRIA_POSTGRES_PORT = 5401
+DEFAULT_MYRIA_POSTGRES_PORT = 5432
 DEFAULT_MYRIA_CONSTANTS_PATH = 'src/edu/washington/escience/myria/MyriaConstants.java'
 
 # myria deployment configuration template
@@ -47,7 +47,7 @@ class MyriaInstaller(DefaultClusterSetup):
                  jvm_version="java-1.7.0-openjdk",
                  database_name='myria',
 
-                 postgres_port=5401,
+                 postgres_port=DEFAULT_MYRIA_POSTGRES_PORT,
                  postgres_version="9.1",
                  postgres_path=DEFAULT_PATH_FORMAT,
                  postgres_name=None,
