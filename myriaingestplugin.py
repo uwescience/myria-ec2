@@ -2,6 +2,7 @@ import json
 from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
 from myria import MyriaConnection, MyriaSchema, MyriaRelation, MyriaQuery
+from myriaplugin import MyriaInstaller
 
 DEPLOYMENT_PATH = '/root/deployment.cfg.ec2'
 DEFAULT_TIMEOUT = 3600
@@ -28,9 +29,9 @@ class MyriaIngest(DefaultClusterSetup):
         self.timeout = timeout
 
         self.scan_type = scan_type
-        self.scan_parameters = scan_parameters
+        self.scan_parameters = json.loads(scan_parameters) if scan_parameters else None
         self.insert_type = insert_type
-        self.insert_parameters = insert_parameters
+        self.insert_parameters = json.loads(insert_parameters) if insert_parameters else None
 
         uris = map(str.strip, uris.splitlines())
         ids = map(int, workers.re.findall(r"\d+", workers)) \
@@ -60,3 +61,5 @@ class MyriaIngest(DefaultClusterSetup):
                 query.wait_for_completion()
                 log.info("Ingest complete (%d, %s)",
                          query.query_id, query.status)
+
+            MyriaInstaller.web_restart(master)

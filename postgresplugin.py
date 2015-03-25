@@ -9,7 +9,7 @@ DEFAULT_PATH_FORMAT = '/usr/lib/postgresql/{version}/bin'
 DEFAULT_PATH = DEFAULT_PATH_FORMAT.format(version=DEFAULT_VERSION)
 
 class PostgresInstaller(DefaultClusterSetup):
-    def __init__(self, 
+    def __init__(self,
                  port=DEFAULT_PORT,
                  version=DEFAULT_VERSION,
                  database_path=DEFAULT_DATA_PATH,
@@ -69,8 +69,9 @@ class PostgresInstaller(DefaultClusterSetup):
     @staticmethod
     def create_user(node, user, password, path=DEFAULT_PATH, port=DEFAULT_PORT):
         sql = "CREATE USER {user} WITH PASSWORD \'{password}\'".format(user=user, password=password)
-        command = """sudo -u postgres {path}/psql -p {port} -c "{sql}"
-               """.format(path=path, port=port, sql=sql)
+        conditional_command = """sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{user}'" | grep -q 1""".format(user=user)
+        create_command = """sudo -u postgres {path}/psql -p {port} -c "{sql}" """.format(path=path, port=port, sql=sql)
+        command = conditional_command + '||' + create_command
         return PostgresInstaller._execute(node, command, path)
 
     @staticmethod
@@ -82,8 +83,9 @@ class PostgresInstaller(DefaultClusterSetup):
 
     @staticmethod
     def create_database(node, name, path=DEFAULT_PATH, port=DEFAULT_PORT):
-        command = """sudo -u postgres {pg_path}/psql -p {port} -c "CREATE DATABASE {db}"
-                    """.format(pg_path=path, port=port, db=name)
+        conditional_command = """sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '{name}'" | grep -q 1""".format(name=name)
+        create_command = """sudo -u postgres {pg_path}/psql -p {port} -c "CREATE DATABASE {db}" """.format(pg_path=path, port=port, db=name)
+        command = conditional_command + '||' + create_command
         return PostgresInstaller._execute(node, command, path)
 
     @staticmethod
