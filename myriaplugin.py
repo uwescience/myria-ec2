@@ -108,7 +108,14 @@ class MyriaInstaller(DefaultClusterSetup):
             self.configure_postgres(node)
 
     def run(self, nodes, master, user, user_shell, volumes):
+        worker_nodes = filter(lambda node: not node.is_master(), nodes)
+
         log.info('Beginning Myria configuration')
+
+        if self.dbms == "postgresql" and master.ssh.isfile('deployment.cfg.ec2'):
+          lines = master.ssh.get_remote_file_lines('deployment.cfg.ec2', 'database_password = .*')
+          if lines:
+            self.postgres['password'] = lines[0].replace('database_password = ', '')
 
         # init nodes in parallel
         for node in nodes:
@@ -139,11 +146,9 @@ class MyriaInstaller(DefaultClusterSetup):
         log.info(
             'Begin write deployment configuration on {}'.format(master.alias))
 
-        slave_nodes = filter(lambda node: not node.is_master(), nodes)
-        if not master.ssh.isfile('deployment.cfg.ec2'):
-          with master.ssh.remote_file('deployment.cfg.ec2', 'w') as descriptor:
-              descriptor.write(
-                  self.get_configuration(master, slave_nodes))
+        with master.ssh.remote_file('deployment.cfg.ec2', 'w') as descriptor:
+            descriptor.write(
+                self.get_configuration(master, worker_nodes))
 
         enter_deploy = "cd {}".format(self.deploy_dir)
         log.info('Begin Myria cluster setup on {}'.format(master.alias))
@@ -165,8 +170,10 @@ class MyriaInstaller(DefaultClusterSetup):
 
     def get_configuration(self, master, nodes):
         return MYRIA_CONFIG.format(
-            path=self.path, name=self.name,
-            dbms=self.dbms, database_password=self.postgres['password'],
+            path=self.path,
+            name=self.name,
+            dbms=self.dbms,
+            database_password=self.postgres['password'],
             port=self.rest_port,
             heap='heap = ' + self.heap if self.heap else '',
             master_alias=master.dns_name,
