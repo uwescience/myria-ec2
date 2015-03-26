@@ -29,12 +29,14 @@ class MyriaIngest(DefaultClusterSetup):
         self.timeout = timeout
 
         self.scan_type = scan_type
-        self.scan_parameters = json.loads(scan_parameters) if scan_parameters else None
+        self.scan_parameters = json.loads(scan_parameters) \
+            if scan_parameters else None
         self.insert_type = insert_type
-        self.insert_parameters = json.loads(insert_parameters) if insert_parameters else None
+        self.insert_parameters = json.loads(insert_parameters) \
+            if insert_parameters else None
 
-        uris = map(str.strip, uris.splitlines())
-        ids = map(int, workers.re.findall(r"\d+", workers)) \
+        uris = [uri.strip() for uri in uris.splitlines()]
+        ids = [int(w) for w in workers.re.findall(r"\d+", workers)] \
             if workers else xrange(1, len(uris)+1)
         self.work = zip(ids, uris)
 
@@ -63,3 +65,9 @@ class MyriaIngest(DefaultClusterSetup):
                          query.query_id, query.status)
 
             MyriaInstaller.web_restart(master)
+
+    def on_restart(self, nodes, master, user, user_shell, volumes):
+        pass
+
+    def on_shutdown(self, nodes, master, user, user_shell, volumes):
+        pass
