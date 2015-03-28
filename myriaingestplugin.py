@@ -15,6 +15,7 @@ class MyriaIngest(DefaultClusterSetup):
                  scan_type=None, scan_parameters=None,
                  insert_type=None, insert_parameters=None,
                  hostname='localhost', port=8753, ssl=False,
+                 overwrite_on_restart=False,
                  wait_for_completion=True,
                  timeout=DEFAULT_TIMEOUT):
         super(MyriaIngest, self).__init__()
@@ -26,6 +27,7 @@ class MyriaIngest(DefaultClusterSetup):
         self.name = name
         self.schema = MyriaSchema(json.loads(schema))
         self.wait_for_completion = wait_for_completion
+        self.overwrite_on_restart = overwrite_on_restart
         self.timeout = timeout
 
         self.scan_type = scan_type
@@ -41,30 +43,33 @@ class MyriaIngest(DefaultClusterSetup):
         self.work = zip(ids, uris)
 
     def run(self, nodes, master, user, user_shell, volumes):
-        for worker, uri in self.work:
-            log.info("Worker #%d ingesting %s", worker, uri)
-
         with master.ssh.remote_file(DEPLOYMENT_PATH, 'r') as descriptor:
-            connection = MyriaConnection(deployment=descriptor, ssl=self.ssl)
-            log.info("MyriaConnection URI: " + connection._url_start)
+            connection = MyriaConnection(hostname=master.dns_name,
+                                         deployment=descriptor,
+                                         ssl=self.ssl)
             relation = MyriaRelation(self.name,
                                      schema=self.schema,
                                      connection=connection)
-            query = MyriaQuery.parallel_import(
-                relation, self.work,
-                scan_type=self.scan_type,
-                scan_parameters=self.scan_parameters,
-                insert_type=self.insert_type,
-                insert_parameters=self.insert_parameters,
-                timeout=self.timeout)
-            log.info("Ingesting as query %d", query.query_id)
 
-            if self.wait_for_completion:
-                query.wait_for_completion()
-                log.info("Ingest complete (%d, %s)",
-                         query.query_id, query.status)
+            if not relation.is_persisted or self.overwrite_on_restart:
+                for worker, uri in self.work:
+                    log.info("Worker #%d ingesting %s", worker, uri)
 
-            MyriaInstaller.web_restart(master)
+                query = MyriaQuery.parallel_import(
+                    relation, self.work,
+                    scan_type=self.scan_type,
+                    scan_parameters=self.scan_parameters,
+                    insert_type=self.insert_type,
+                    insert_parameters=self.insert_parameters,
+                    timeout=self.timeout)
+                log.info("Ingesting as query %d", query.query_id)
+
+                if self.wait_for_completion:
+                    query.wait_for_completion()
+                    log.info("Ingest complete (%d, %s)",
+                             query.query_id, query.status)
+
+                MyriaInstaller.web_restart(master)
 
     def on_restart(self, nodes, master, user, user_shell, volumes):
         pass
