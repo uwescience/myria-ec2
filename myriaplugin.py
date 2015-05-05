@@ -9,7 +9,7 @@ from starcluster.logger import log
 DEFAULT_MYRIA_POSTGRES_PORT = 5432
 DEFAULT_MYRIA_CONSTANTS_PATH = 'src/edu/washington/escience/myria/MyriaConstants.java'
 
-DEFAULT_APPENGINE_URL = 'https://storage.googleapis.com/appengine-sdks/featured/google_appengine_1.9.18.zip'
+DEFAULT_APPENGINE_URL = 'https://storage.googleapis.com/appengine-sdks/featured/google_appengine_1.9.19.zip'
 DEFAULT_WEB_REPOSITORY_URL = 'https://github.com/uwescience/myria-web.git'
 DEFAULT_PYTHON_REPOSITORY_URL = 'https://github.com/uwescience/myria-python.git'
 DEFAULT_HOSTNAME_CONFIG_PATH = '/mnt/myria_web/appengine/myria_web_main.py'
