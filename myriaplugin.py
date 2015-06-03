@@ -2,7 +2,7 @@ import os
 import time
 import random
 import string
-from postgresplugin import PostgresInstaller, DEFAULT_PATH_FORMAT
+from postgresplugin import PostgresInstaller, DEFAULT_PATH_FORMAT, DEFAULT_DATA_PATH
 from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
 
@@ -68,7 +68,7 @@ class MyriaInstaller(DefaultClusterSetup):
 
                  postgres_port=DEFAULT_MYRIA_POSTGRES_PORT,
                  postgres_version="9.1",
-                 postgres_path="/mnt/postgresdata",
+                 postgres_path=DEFAULT_PATH_FORMAT,
                  postgres_name=None,
                  postgres_username="uwdb",
                  postgres_password="".join(random.sample(string.lowercase+string.digits, 10))):
@@ -228,7 +228,7 @@ class MyriaInstaller(DefaultClusterSetup):
         username = self.postgres['username']
         password = self.postgres['password']
         version = self.postgres['version']
-        path = DEFAULT_PATH_FORMAT.format(version=version)
+        path = self.postgres['path'].format(version=version)
         port = self.postgres['port']
 
         if username != 'uwdb':

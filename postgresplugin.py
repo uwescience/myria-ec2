@@ -21,7 +21,7 @@ class PostgresInstaller(DefaultClusterSetup):
         self.database_path = database_path
         self.install_on_master = install_on_master
 
-        #generated properties
+        # Generated properties
         self.log = "{}/server.log".format(database_path)
         self.path = DEFAULT_PATH_FORMAT.format(version=version)
         self.conf = '/etc/postgresql/{}/main/postgresql.conf'.format(version)
@@ -33,21 +33,18 @@ class PostgresInstaller(DefaultClusterSetup):
         if not node.is_master() or self.install_on_master:
             log.info("Setting up postgres on {}".format(node.alias))
 
-            start_pg = """
-            sudo -u postgres {pg_path}/pg_ctl -D {data} -o "{opt}" -l {log} start;
-            """.format(
-                pg_path=self.path, data=self.database_path,
-                opt=self.options, log=self.log)
-
             node.ssh.execute('sudo add-apt-repository -r "deb http://www.cs.wisc.edu/condor/debian/development lenny contrib"')
             node.apt_command('update')
             node.apt_install("postgresql-{}".format(self.version))
-            node.ssh.execute("sudo service postgresql stop")
-            node.ssh.execute("sudo mkdir -p {}".format(self.database_path))
-            node.ssh.execute("sudo chown postgres {}".format(self.database_path))
 
             self.set_port(node, self.port, version=self.version)
+            self.set_data_path(node, data_path=self.database_path, version=self.version, restart=False)
 
+            start_pg = """
+                sudo -u postgres {pg_path}/pg_ctl -D {data} -o "{opt}" -l {log} start;
+                """.format(
+                           pg_path=self.path, data=self.database_path,
+                           opt=self.options, log=self.log)
             node.ssh.execute(start_pg)
 
             # sleep 5 seconds wait for postgres start
@@ -106,8 +103,49 @@ class PostgresInstaller(DefaultClusterSetup):
             descriptor.write(authentication + '\n')
 
     @staticmethod
+    def set_data_path(node, config_path='/etc/postgresql/{version}/main/postgresql.conf',
+                            data_path=DEFAULT_DATA_PATH,
+                            version=DEFAULT_VERSION,
+                            restart=True):
+        PostgresInstaller.stop(node)
+
+        node.ssh.execute("sudo mkdir -m 700 -p {}".format(data_path))
+        node.ssh.execute(r"""sudo cp -rp `grep -Po "data_directory\\s*=\\s*'\K[^']*(?=')" {config_path}`/* {data_path}""".format(
+            config_path=config_path.format(version=version),
+            data_path=data_path))
+
+		# Just in case directory already existed
+        node.ssh.execute("sudo chmod 700 {}".format(data_path))
+        node.ssh.execute("sudo chown -R postgres {}".format(data_path))
+        node.ssh.execute("sudo chgrp -R postgres {}".format(data_path))
+
+        # Change data directory in .config
+        node.ssh.execute(r"""sed -i "s+^\\s*data_directory\\s*=\\s*'[^']*'+data_directory = '{data_path}'+g" {config_path}""".format(
+            data_path=data_path,
+            config_path=config_path.format(version=version)))
+
+        PostgresInstaller.start(node)
+
+    @staticmethod
     def restart(node):
         node.ssh.execute('sudo service postgresql restart')
+
+    @staticmethod
+    def start(node):
+        node.ssh.execute('sudo service postgresql start')
+
+    @staticmethod
+    def stop(node):
+        node.ssh.execute('sudo service postgresql stop')
+
+    @staticmethod
+    def restart(node):
+        node.ssh.execute('sudo service postgresql restart')
+
+    @staticmethod
+    def initialize_database(node, database_path, path=DEFAULT_PATH):
+        node.ssh.execute("sudo -u postgres {pg_path}/initdb -D {data_path}".format(
+        	pg_path=path, data_path=database_path))
 
     @staticmethod
     def _execute(node, command, path=DEFAULT_PATH):
