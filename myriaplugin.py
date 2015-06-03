@@ -9,8 +9,13 @@ from starcluster.logger import log
 DEFAULT_MYRIA_POSTGRES_PORT = 5432
 DEFAULT_MYRIA_CONSTANTS_PATH = 'src/edu/washington/escience/myria/MyriaConstants.java'
 
+DEFAULT_APPENGINE_URL = 'https://storage.googleapis.com/appengine-sdks/featured/google_appengine_1.9.21.zip'
+DEFAULT_WEB_REPOSITORY_URL = 'https://github.com/uwescience/myria-web.git'
+DEFAULT_PYTHON_REPOSITORY_URL = 'https://github.com/uwescience/myria-python.git'
+DEFAULT_HOSTNAME_CONFIG_PATH = '/mnt/myria_web/appengine/myria_web_main.py'
+
 # myria deployment configuration template
-myria_config = """
+MYRIA_CONFIG = """
 # Deployment configuration
 [deployment]
 name = {name}
@@ -28,6 +33,19 @@ database_password = {database_password}
 {workers}
 """
 
+MYRIA_WEB_SERVICE_CONFIG = \
+"""'# Myria-Web Service
+
+description     "Myria Webserver"
+author          "Brandon Haynes <bhaynes@cs.washington.edu>"
+
+start on runlevel [2345]
+stop on starting rc RUNLEVEL=[016]
+
+respawn
+
+exec /mnt/google_appengine/dev_appserver.py --host {hostname} --port 80 --skip_sdk_update_check true /mnt/myria_web/appengine'"""
+
 class MyriaInstaller(DefaultClusterSetup):
 
     def __init__(self,
@@ -39,7 +57,8 @@ class MyriaInstaller(DefaultClusterSetup):
                  master_port=8001,
                  worker_port=9001,
                  required_packages=['git', 'openjdk-7-jre', 'openjdk-7-jdk',
-                                    'libxml2-dev', 'libxslt1-dev', 'python-dev'],
+                                    'libxml2-dev', 'libxslt1-dev', 'python-dev',
+                                    'chkconfig'],
                  additional_packages=[],
                  repository='https://github.com/uwescience/myria.git',
                  install_directory='~/myria',
@@ -89,7 +108,14 @@ class MyriaInstaller(DefaultClusterSetup):
             self.configure_postgres(node)
 
     def run(self, nodes, master, user, user_shell, volumes):
+        worker_nodes = filter(lambda node: not node.is_master(), nodes)
+
         log.info('Beginning Myria configuration')
+
+        if self.dbms == "postgresql" and master.ssh.isfile('deployment.cfg.ec2'):
+          lines = master.ssh.get_remote_file_lines('deployment.cfg.ec2', 'database_password = .*')
+          if lines:
+            self.postgres['password'] = lines[0].replace('database_password = ', '')
 
         # init nodes in parallel
         for node in nodes:
@@ -120,10 +146,9 @@ class MyriaInstaller(DefaultClusterSetup):
         log.info(
             'Begin write deployment configuration on {}'.format(master.alias))
 
-        slave_nodes = filter(lambda node: not node.is_master(), nodes)
         with master.ssh.remote_file('deployment.cfg.ec2', 'w') as descriptor:
             descriptor.write(
-                self.get_configuration(master, slave_nodes))
+                self.get_configuration(master, worker_nodes))
 
         enter_deploy = "cd {}".format(self.deploy_dir)
         log.info('Begin Myria cluster setup on {}'.format(master.alias))
@@ -138,18 +163,17 @@ class MyriaInstaller(DefaultClusterSetup):
             '{} && sudo ./launch_cluster.sh ~/deployment.cfg.ec2'.format(
                 enter_deploy))
 
-        log.info('Installing Myria-Python on {}'.format(master.alias))
-        master.ssh.execute(
-            'git clone https://github.com/uwescience/myria-python.git ~/myria-python &&'
-            'cd ~/myria-python &&'
-            'python setup.py install')
+        self.configure_python(master, DEFAULT_PYTHON_REPOSITORY_URL)
+        self.configure_web(master, DEFAULT_APPENGINE_URL, DEFAULT_WEB_REPOSITORY_URL)
 
         log.info('End Myria configuration')
 
     def get_configuration(self, master, nodes):
-        return myria_config.format(
-            path=self.path, name=self.name,
-            dbms=self.dbms, database_password=self.postgres['password'],
+        return MYRIA_CONFIG.format(
+            path=self.path,
+            name=self.name,
+            dbms=self.dbms,
+            database_password=self.postgres['password'],
             port=self.rest_port,
             heap='heap = ' + self.heap if self.heap else '',
             master_alias=master.dns_name,
@@ -157,6 +181,47 @@ class MyriaInstaller(DefaultClusterSetup):
             workers='\n'.join('{} = {}:{}::{}'.format(
                 id + 1, node.dns_name, self.worker_port, self.database_name)
                 for id, node in enumerate(nodes)))
+
+    def configure_web(self, node, appengine_url, repository_url):
+        log.info('Begin installing Myria-Web on %s', node.alias)
+
+        log.info('Disable Apache webserver')
+        node.ssh.execute('/etc/init.d/apache2 stop &&'
+                         'update-rc.d apache2 disable')
+
+        log.info('Download and decompress Google Appengine from %s', appengine_url)
+        node.ssh.execute('wget {} -O google_appengine.zip &&'
+                         'unzip -od /mnt google_appengine.zip'.format(appengine_url))
+
+        log.info('Clone and prepare myria-web repository at %s', repository_url)
+        node.ssh.execute('rm -rf {dir} &&'
+                         'git clone {repository} {dir} &&'
+                         'cd {dir} &&'
+                         'git submodule init &&'
+                         'git submodule update &&'
+                         'cd {dir}/submodules/raco &&'
+                         'python setup.py install &&'
+                         'scripts/myrial examples/reachable.myl'.format(dir='/mnt/myria_web', repository=repository_url))
+
+        log.info('Update REST endpoint URL to %s', node.dns_name)
+        node.ssh.execute(r'''sed -i "s/hostname='localhost'/hostname='{hostname}'/" {path}'''.format(
+            hostname=node.dns_name, path=DEFAULT_HOSTNAME_CONFIG_PATH))
+
+        log.info('Create myria-web service and launch')
+        node.ssh.execute('echo {} > /etc/init/myria-web.conf'.format(MYRIA_WEB_SERVICE_CONFIG.format(hostname=node.dns_name)))
+        self.web_restart(node)
+
+        log.info('Done installing Myria-Web on %s', node.alias)
+
+    def configure_python(self, node, repository_url):
+        log.info('Installing Myria-Python on %s', node.alias)
+        node.ssh.execute(
+            'rm -rf {dir} &&'
+            'git clone {repository} {dir} &&'
+            'cd ~/myria-python &&'
+            'python setup.py install'.format(dir='~/myria-python',
+                                             repository=repository_url))
+        log.info('Done installing Myria-Python on %s', node.alias)
 
     def configure_postgres(self, node):
         database = self.database_name
@@ -185,3 +250,15 @@ class MyriaInstaller(DefaultClusterSetup):
           node.ssh.execute(r'sed -i "s/STORAGE_POSTGRESQL_PORT\s*=\s*[0-9]\+/STORAGE_POSTGRESQL_PORT = {port}/ig" {path}'.format(
               port=port,
               path=os.path.join(self.directory, DEFAULT_MYRIA_CONSTANTS_PATH)))
+
+    @staticmethod
+    def web_start(node):
+        node.ssh.execute('sudo service myria-web start')
+
+    @staticmethod
+    def web_stop(node):
+        node.ssh.execute('sudo service myria-web stop')
+
+    @staticmethod
+    def web_restart(node):
+        node.ssh.execute('sudo service myria-web restart')

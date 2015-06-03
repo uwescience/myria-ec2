@@ -15,7 +15,7 @@ secret_token = '#your_secret_access_key'
 
 class RegisterPluginDecorator(install):
     def run(self):
-        install.run(self)
+        install.do_egg_install(self)
 
         root_configuration = self.ensure_configuration()
         self.ensure_credentials(root_configuration)
