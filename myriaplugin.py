@@ -175,7 +175,7 @@ class MyriaInstaller(DefaultClusterSetup):
             dbms=self.dbms,
             database_password=self.postgres['password'],
             port=self.rest_port,
-            heap='heap = ' + self.heap if self.heap else '',
+            heap='max_heap_size = ' + self.heap if self.heap else '',
             master_alias=master.dns_name,
             master_port=self.master_port,
             workers='\n'.join('{} = {}:{}::{}'.format(
