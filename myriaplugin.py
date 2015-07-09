@@ -207,39 +207,6 @@ class MyriaInstaller(DefaultClusterSetup):
               coordinator=master.dns_name,
               workers=' '.join(node.dns_name for node in nodes),
               deployment_filename=DEFAULT_DEPLOYMENT_FILENAME))
-#MYRIA_CONFIG = """
-# Deployment configuration
-#[deployment]
-#name = {name}
-#path = {path}
-#rest_port = {port}
-#dbms = {dbms}
-#database_password = {database_password}
-#{heap}
-
-# Compute nodes configuration
-#[master]
-#0 = {master_alias}:{master_port}
-
-#[workers]
-#{workers}
-#"""
-#with master.ssh.remote_file('deployment.cfg.ec2', 'w') as descriptor:
-#    descriptor.write(
-#        self.get_configuration(master, worker_nodes))
-
-#return MYRIA_CONFIG.format(
-#    path=self.path,
-#    name=self.name,
-#    dbms=self.dbms,
-#    database_password=self.postgres['password'],
-#    port=self.rest_port,
-#    heap='max_heap_size = ' + self.heap if self.heap else '',
-#    master_alias=master.dns_name,
-#    master_port=self.master_port,
-#    workers='\n'.join('{} = {}:{}::{}'.format(
-#        id + 1, node.dns_name, self.worker_port, self.database_name)
-#        for id, node in enumerate(nodes)))
 
     def configure_web(self, node, appengine_url, repository_url):
         log.info('Begin installing Myria-Web on %s', node.alias)
