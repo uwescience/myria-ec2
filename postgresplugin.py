@@ -8,6 +8,7 @@ DEFAULT_DATA_PATH = '/mnt/postgresdata'
 DEFAULT_PATH_FORMAT = '/usr/lib/postgresql/{version}/bin'
 DEFAULT_PATH = DEFAULT_PATH_FORMAT.format(version=DEFAULT_VERSION)
 
+
 class PostgresInstaller(DefaultClusterSetup):
     def __init__(self,
                  port=DEFAULT_PORT,
@@ -33,18 +34,22 @@ class PostgresInstaller(DefaultClusterSetup):
         if not node.is_master() or self.install_on_master:
             log.info("Setting up postgres on {}".format(node.alias))
 
-            node.ssh.execute('sudo add-apt-repository -r "deb http://www.cs.wisc.edu/condor/debian/development lenny contrib"')
+            node.ssh.execute('sudo add-apt-repository -r "deb '
+                             'http://www.cs.wisc.edu/condor/debian/development'
+                             ' lenny contrib"')
             node.apt_command('update')
             node.apt_install("postgresql-{}".format(self.version))
 
             self.set_port(node, self.port, version=self.version)
-            self.set_data_path(node, data_path=self.database_path, version=self.version, restart=False)
+            self.set_data_path(node,
+                               data_path=self.database_path,
+                               version=self.version,
+                               restart=False)
 
-            start_pg = """
-                sudo -u postgres {pg_path}/pg_ctl -D {data} -o "{opt}" -l {log} start;
-                """.format(
-                           pg_path=self.path, data=self.database_path,
-                           opt=self.options, log=self.log)
+            start_pg = ('sudo -u postgres {pg_path}/pg_ctl '
+                        '-D {data} -o "{opt}" -l {log} start;').format(
+                            pg_path=self.path, data=self.database_path,
+                            opt=self.options, log=self.log)
             node.ssh.execute(start_pg)
 
             # sleep 5 seconds wait for postgres start
@@ -64,8 +69,10 @@ class PostgresInstaller(DefaultClusterSetup):
         log.info('End Postgres configuration')
 
     @staticmethod
-    def create_user(node, user, password, path=DEFAULT_PATH, port=DEFAULT_PORT):
-        sql = "CREATE USER {user} WITH PASSWORD \'{password}\'".format(user=user, password=password)
+    def create_user(node, user, password,
+                    path=DEFAULT_PATH, port=DEFAULT_PORT):
+        sql = "CREATE USER {user} WITH PASSWORD \'{password}\'".format(
+            user=user, password=password)
         conditional_command = """sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{user}'" | grep -q 1""".format(user=user)
         create_command = """sudo -u postgres {path}/psql -p {port} -c "{sql}" """.format(path=path, port=port, sql=sql)
         command = conditional_command + '||' + create_command
