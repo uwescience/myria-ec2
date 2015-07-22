@@ -5,6 +5,7 @@ from starcluster.logger import log
 DEFAULT_VERSION = 9.1
 DEFAULT_PORT = 5432
 DEFAULT_DATA_PATH = '/mnt/postgresdata'
+#eventually check to change data path
 DEFAULT_PATH_FORMAT = '/usr/lib/postgresql/{version}/bin'
 DEFAULT_PATH = DEFAULT_PATH_FORMAT.format(version=DEFAULT_VERSION)
 
@@ -32,6 +33,25 @@ class PostgresInstaller(DefaultClusterSetup):
 
         if not node.is_master() or self.install_on_master:
             log.info("Setting up postgres on {}".format(node.alias))
+
+            # if not node.is_master():
+            #     create volumes here from config OR attach previous from config desc
+
+            #     log.info('attaching an EBS volume to ' + str(node.id))
+
+            #     bashCommand = "aws ec2 attach-volume  --region us-east-1 --volume-id vol-a653d84c --instance-id " + node.id + " --device /dev/sdc"
+            #     print bashCommand
+            #     os.system(bashCommand)
+
+            #     # sleep 5 seconds wait
+            #     time.sleep(10)
+
+            #     #mounting new drive
+            #     node.ssh.execute('lsblk')
+            #     node.ssh.execute('sudo mkfs -t ext4 /dev/xvdc;')
+
+            #     node.ssh.execute('sudo mount /dev/xvdc /data_mount;')
+
 
             node.ssh.execute('sudo add-apt-repository -r "deb http://www.cs.wisc.edu/condor/debian/development lenny contrib"')
             node.apt_command('update')
