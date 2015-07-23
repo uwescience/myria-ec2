@@ -1,11 +1,11 @@
 import time
+import os
 from starcluster.clustersetup import DefaultClusterSetup
 from starcluster.logger import log
 
 DEFAULT_VERSION = 9.1
 DEFAULT_PORT = 5432
 DEFAULT_DATA_PATH = '/mnt/postgresdata'
-#eventually check to change data path
 DEFAULT_PATH_FORMAT = '/usr/lib/postgresql/{version}/bin'
 DEFAULT_PATH = DEFAULT_PATH_FORMAT.format(version=DEFAULT_VERSION)
 
@@ -14,13 +14,15 @@ class PostgresInstaller(DefaultClusterSetup):
                  port=DEFAULT_PORT,
                  version=DEFAULT_VERSION,
                  database_path=DEFAULT_DATA_PATH,
-                 install_on_master=True):
+                 install_on_master=True,
+                 new_ebs=False):
         super(PostgresInstaller, self).__init__()
 
         self.port = port
         self.version = version
         self.database_path = database_path
         self.install_on_master = install_on_master
+        self.new_ebs = new_ebs
 
         # Generated properties
         self.log = "{}/server.log".format(database_path)
@@ -34,24 +36,28 @@ class PostgresInstaller(DefaultClusterSetup):
         if not node.is_master() or self.install_on_master:
             log.info("Setting up postgres on {}".format(node.alias))
 
-            # if not node.is_master():
-            #     create volumes here from config OR attach previous from config desc
+            if self.new_ebs is True:
+                self.database_path = '/data_mount'
+                node.ssh.execute('mkdir /data_mount')
 
-            #     log.info('attaching an EBS volume to ' + str(node.id))
+                log.info('create new EBS volume for ' + str(node.alias))
+                
+                create_drive_command = "aws ec2 create-volume --size 10 --region us-east-1 --availability-zone us-east-1b --volume-type gp2"
+                output_create_drive = os.popen(create_drive_command).read()
+                volume_name = output_create_drive.split('\t')[7]
 
-            #     bashCommand = "aws ec2 attach-volume  --region us-east-1 --volume-id vol-a653d84c --instance-id " + node.id + " --device /dev/sdc"
-            #     print bashCommand
-            #     os.system(bashCommand)
+                time.sleep(10)
 
-            #     # sleep 5 seconds wait
-            #     time.sleep(10)
+                log.info('attaching an EBS volume to ' + str(node.alias))
+                attach_volume_command = "aws ec2 attach-volume  --region us-east-1 --volume-id " + volume_name + " --instance-id " + node.id + " --device /dev/sdc"
+                os.system(attach_volume_command)
 
-            #     #mounting new drive
-            #     node.ssh.execute('lsblk')
-            #     node.ssh.execute('sudo mkfs -t ext4 /dev/xvdc;')
+                time.sleep(20)
 
-            #     node.ssh.execute('sudo mount /dev/xvdc /data_mount;')
-
+                #mounting new drive
+                node.ssh.execute('lsblk')
+                node.ssh.execute('sudo mkfs -t ext4 /dev/xvdc;')
+                node.ssh.execute('sudo mount /dev/xvdc /data_mount;')
 
             node.ssh.execute('sudo add-apt-repository -r "deb http://www.cs.wisc.edu/condor/debian/development lenny contrib"')
             node.apt_command('update')
@@ -134,7 +140,7 @@ class PostgresInstaller(DefaultClusterSetup):
             config_path=config_path.format(version=version),
             data_path=data_path))
 
-		# Just in case directory already existed
+        # Just in case directory already existed
         node.ssh.execute("sudo chmod 700 {}".format(data_path))
         node.ssh.execute("sudo chown -R postgres {}".format(data_path))
         node.ssh.execute("sudo chgrp -R postgres {}".format(data_path))
@@ -165,7 +171,7 @@ class PostgresInstaller(DefaultClusterSetup):
     @staticmethod
     def initialize_database(node, database_path, path=DEFAULT_PATH):
         node.ssh.execute("sudo -u postgres {pg_path}/initdb -D {data_path}".format(
-        	pg_path=path, data_path=database_path))
+            pg_path=path, data_path=database_path))
 
     @staticmethod
     def _execute(node, command, path=DEFAULT_PATH):
