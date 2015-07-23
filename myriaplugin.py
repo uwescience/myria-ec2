@@ -165,7 +165,7 @@ class MyriaInstaller(DefaultClusterSetup):
             '--database-password {password} '
             '--coordinator-port {coordinator_port} '
             '--worker-base-port {worker_port} '
-            '--heap "{heap}" '
+            '--jvm-max-heap-size-gb "{heap}" '
             '{path} {coordinator} {workers} > {deployment_filename}'.format(
               deploy_dir=self.deploy_dir,
               rest_port=self.rest_port,
